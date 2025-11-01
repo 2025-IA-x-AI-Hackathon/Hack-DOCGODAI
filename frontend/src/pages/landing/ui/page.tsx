@@ -8,6 +8,7 @@ import {
   SparklesIcon,
 } from "lucide-react";
 
+import { sectionStyle } from "@/shared/styles";
 import { Card } from "@/shared/ui";
 
 const features = [
@@ -66,7 +67,12 @@ const LandingPage = () => {
   return (
     <div className="flex min-h-screen flex-col">
       {/* Hero Section */}
-      <section className="relative flex max-h-[960px] min-h-[80vh] flex-col items-center justify-center overflow-hidden px-6 py-20 text-center">
+      <section
+        className={sectionStyle({
+          class:
+            "relative flex max-h-[960px] min-h-[80vh] flex-col items-center justify-center overflow-hidden px-6 py-20 text-center",
+        })}
+      >
         <motion.div
           animate="animate"
           className="mx-auto max-w-4xl"
@@ -127,7 +133,7 @@ const LandingPage = () => {
       </section>
 
       {/* Features Section */}
-      <section className="bg-default-50 py-20">
+      <section className={sectionStyle({ class: "bg-default-50 py-20" })}>
         <div className="mx-auto max-w-6xl px-6">
           <motion.div
             className="mb-16 text-center"
@@ -182,7 +188,7 @@ const LandingPage = () => {
       </section>
 
       {/* How it works Section */}
-      <section className="py-20">
+      <section className={sectionStyle({ class: "py-20" })}>
         <div className="mx-auto max-w-6xl px-6">
           <motion.div
             className="mb-16 text-center"
@@ -258,7 +264,7 @@ const LandingPage = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="bg-primary/5 py-20">
+      <section className={sectionStyle({ class: "bg-primary/5 py-20" })}>
         <motion.div
           className="mx-auto max-w-4xl px-6 text-center"
           initial="initial"

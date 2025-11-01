@@ -1,3 +1,5 @@
+import { sectionStyle } from "../styles";
+
 interface Props {
   title?: string;
   subtitle?: string;
@@ -5,7 +7,7 @@ interface Props {
 }
 
 export const Section = ({ title, subtitle, children }: Props) => (
-  <section className="mx-auto w-full py-12 md:py-16">
+  <section className={sectionStyle({ class: "py-12 md:py-16" })}>
     {title && (
       <div className="mb-8">
         <h2 className="text-foreground-800 text-2xl font-bold tracking-tight md:text-4xl">

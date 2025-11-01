@@ -1,18 +1,14 @@
-import {
-  Navbar,
-  NavbarBrand,
-  NavbarContent,
-  NavbarItem,
-} from "@heroui/react";
+import { Navbar, NavbarBrand, NavbarContent, NavbarItem } from "@heroui/react";
 import { Link } from "@tanstack/react-router";
 
+import { sectionStyle } from "@/shared/styles";
 import { ThemeSwitcher } from "@/shared/ui";
 
 const Navigation = () => {
   return (
     <Navbar
       classNames={{
-        wrapper: "max-w-none px-0",
+        wrapper: sectionStyle(),
       }}
     >
       <NavbarBrand>
@@ -25,16 +21,16 @@ const Navigation = () => {
       <NavbarContent justify="end">
         <NavbarItem>
           <Link
-            to="/login"
             className="text-default-600 hover:text-foreground text-sm transition-colors"
+            to="/login"
           >
             로그인
           </Link>
         </NavbarItem>
         <NavbarItem>
           <Link
-            to="/signup"
             className="text-primary hover:text-primary-600 text-sm font-medium transition-colors"
+            to="/signup"
           >
             회원가입
           </Link>

@@ -6,7 +6,7 @@ import Navigation from "@/widgets/navigation";
 
 export const Route = createRootRoute({
   component: () => (
-    <HeroUIProvider className="mx-auto w-full max-w-6xl px-6 md:px-8">
+    <HeroUIProvider>
       <ThemeProvider attribute="class">
         <Navigation />
         <Outlet />
