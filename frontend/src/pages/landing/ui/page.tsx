@@ -69,15 +69,10 @@ const LandingPage = () => {
   return (
     <div className="flex min-h-screen flex-col">
       {/* Hero Section */}
-      <section
-        className={sectionStyle({
-          class:
-            "relative flex max-h-[960px] min-h-[80vh] flex-col items-center justify-center overflow-hidden px-6 py-20 text-center",
-        })}
-      >
+      <section className="relative flex max-h-[960px] min-h-[80vh] flex-col items-center justify-center overflow-hidden py-20 text-center">
         <motion.div
           animate="animate"
-          className="mx-auto max-w-4xl"
+          className={sectionStyle()}
           initial="initial"
           variants={staggerContainer}
         >
@@ -135,8 +130,8 @@ const LandingPage = () => {
       </section>
 
       {/* Features Section */}
-      <section className={sectionStyle({ class: "bg-default-50 py-20" })}>
-        <div className="mx-auto max-w-6xl px-6">
+      <section className="bg-default-50 py-20">
+        <div className={sectionStyle()}>
           <motion.div
             className="mb-16 text-center"
             initial="initial"
@@ -153,7 +148,7 @@ const LandingPage = () => {
             </p>
           </motion.div>
           <motion.div
-            className="grid gap-6 md:grid-cols-2 lg:grid-cols-4"
+            className="grid gap-6 px-6 md:grid-cols-2 lg:grid-cols-4"
             initial="initial"
             variants={staggerContainer}
             viewport={{ once: true, margin: "-50px" }}
@@ -190,8 +185,8 @@ const LandingPage = () => {
       </section>
 
       {/* How it works Section */}
-      <section className={sectionStyle({ class: "py-20" })}>
-        <div className="mx-auto max-w-6xl px-6">
+      <section className="py-20">
+        <div className={sectionStyle()}>
           <motion.div
             className="mb-16 text-center"
             initial="initial"
@@ -207,7 +202,7 @@ const LandingPage = () => {
             </p>
           </motion.div>
           <motion.div
-            className="grid gap-8 md:grid-cols-3"
+            className="grid gap-8 px-6 md:grid-cols-3"
             initial="initial"
             variants={staggerContainer}
             viewport={{ once: true, margin: "-50px" }}
@@ -266,13 +261,11 @@ const LandingPage = () => {
       </section>
 
       {/* CTA Section */}
-      <section
-        className={sectionStyle({
-          class: "bg-primary/5 dark:bg-primary/10 py-20",
-        })}
-      >
+      <section className="bg-primary/5 dark:bg-primary/10 py-20">
         <motion.div
-          className="mx-auto max-w-4xl px-6 text-center"
+          className={sectionStyle({
+            class: "text-center",
+          })}
           initial="initial"
           variants={staggerContainer}
           viewport={{ once: true, margin: "-100px" }}
