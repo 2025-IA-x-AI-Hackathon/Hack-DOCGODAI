@@ -1,0 +1,5 @@
+.env
+volume-kafka/
+volume-mysql/
+volume-n8n/
+volume-redis/
