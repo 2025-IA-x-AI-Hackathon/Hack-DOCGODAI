@@ -16,6 +16,9 @@ export default heroui({
         secondary: {
           DEFAULT: "#18181b",
         },
+        danger: {
+          DEFAULT: "#f84d3a",
+        },
       },
     },
     dark: {
@@ -30,6 +33,9 @@ export default heroui({
         },
         secondary: {
           DEFAULT: "#52525b",
+        },
+        danger: {
+          DEFAULT: "#f84d3a",
         },
       },
     },
