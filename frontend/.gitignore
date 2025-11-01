@@ -26,3 +26,5 @@ dist-ssr
 # Tanstack
 src/**/*.gen.*
 .tanstack/
+
+*.pdf
