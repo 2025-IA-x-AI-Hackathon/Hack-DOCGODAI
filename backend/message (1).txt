@@ -1,0 +1,363 @@
+🧑‍🎓 Member Router
+1. 회원가입
+
+POST /member/signup
+
+새 사용자를 등록합니다.
+
+Request
+
+{
+  "email": "user@example.com",
+  "password": "1234abcd"
+}
+
+
+Response
+
+{
+  "id": 1,
+  "email": "user@example.com",
+  "created_at": "2025-11-01T12:00:00"
+}
+
+2. 로그인
+
+POST /member/login
+
+사용자 로그인 후 JWT 토큰을 발급합니다.
+
+Request
+
+{
+  "email": "user@example.com",
+  "password": "1234abcd"
+}
+
+
+Response
+
+{
+  "access_token": "eyJhbGciOiJIUzI1...",
+  "token_type": "bearer",
+  "member_id": 1
+}
+
+3. 유저 정보 조회
+
+GET /member
+
+로그인된 사용자 정보를 반환합니다.
+(헤더에 Authorization: Bearer <token> 필요)
+
+Response
+
+{
+  "id": 1,
+  "email": "user@example.com",
+  "created_at": "2025-11-01T12:00:00"
+}
+
+📘 Course Router
+1. 강의 리스트 조회
+
+GET /course
+
+등록된 모든 강의 목록을 조회합니다.
+
+Response
+
+[
+  {
+    "id": 1,
+    "title": "파이썬 기초",
+    "description": "변수, 조건문, 반복문을 배우는 과정입니다.",
+    "difficulty": "easy",
+    "owner_id": 1,
+    "created_at": "2025-11-01T12:00:00"
+  }
+]
+
+2. 강의 생성
+
+POST /course
+
+새로운 강의를 생성합니다.
+
+Request
+
+{
+  "title": "FastAPI 백엔드 입문",
+  "description": "FastAPI 기반의 서버 구축 실습",
+  "difficulty": "medium",
+  "owner_id": 1
+}
+
+
+Response
+
+{
+  "id": 3,
+  "title": "FastAPI 백엔드 입문",
+  "description": "FastAPI 기반의 서버 구축 실습",
+  "difficulty": "medium",
+  "owner_id": 1,
+  "created_at": "2025-11-01T12:05:00"
+}
+
+3. 강의 상세 보기
+
+GET /course/:course_id
+
+특정 강의의 상세 정보를 조회합니다.
+
+Response
+
+{
+  "id": 1,
+  "title": "파이썬 기초",
+  "description": "변수, 조건문, 반복문을 배우는 과정입니다.",
+  "difficulty": "easy",
+  "chapters": [
+    { "id": 1, "title": "변수와 자료형" },
+    { "id": 2, "title": "조건문" }
+  ]
+}
+
+📖 Chapter Router
+1. 챕터 생성
+
+POST /chapter
+
+새 챕터를 생성하고, 아래 세 가지 리소스를 동시에 생성합니다:
+
+개념 정리(concept)
+
+실습 과제(exercise)
+
+형성평가(quiz: 3개 slot)
+
+Request
+
+{
+  "course_id": 1,
+  "title": "반복문",
+  "description": "for문, while문 학습",
+  "owner_id": 1
+}
+
+
+Response
+
+{
+  "chapter_id": 10,
+  "concept_id": 25,
+  "exercise_id": 33,
+  "quiz_slots": [1, 2, 3],
+  "created_at": "2025-11-01T12:10:00"
+}
+
+2. 챕터 상세 보기
+
+GET /chapter/:chapter_id
+
+챕터의 개요 및 관련 리소스 상태를 조회합니다.
+
+Response
+
+{
+  "id": 10,
+  "title": "반복문",
+  "description": "for문, while문 학습",
+  "is_active": true,
+  "concept": { "id": 25, "is_complete": false },
+  "exercise": { "id": 33, "is_complete": false },
+  "quiz": [
+    { "slot_number": 1, "status": "pending" },
+    { "slot_number": 2, "status": "pending" },
+    { "slot_number": 3, "status": "pending" }
+  ]
+}
+
+🧠 Concept Router
+1. 개념 정리 보기
+
+GET /concept/:chapter_id
+
+해당 챕터의 개념 정리 내용을 조회합니다.
+
+Response
+
+{
+  "id": 25,
+  "chapter_id": 10,
+  "title": "반복문 기본 개념",
+  "content": "반복문은 동일한 작업을 여러 번 수행하기 위한 구조입니다.",
+  "is_complete": false
+}
+
+2. 개념 학습 완료
+
+PATCH /concept/:chapter_id
+
+학습 완료로 상태를 변경합니다.
+
+Request
+
+{
+  "is_complete": true
+}
+
+
+Response
+
+{
+  "chapter_id": 10,
+  "is_complete": true,
+  "updated_at": "2025-11-01T12:20:00"
+}
+
+🧩 Exercise Router
+1. 실습 과제 보기
+
+GET /exercise/:chapter_id
+
+해당 챕터의 실습 과제를 조회합니다.
+
+Response
+
+{
+  "id": 33,
+  "chapter_id": 10,
+  "question": "1부터 10까지 더하는 for문을 작성하시오.",
+  "difficulty": "easy",
+  "is_complete": false
+}
+
+2. 실습 과제 완료
+
+PATCH /exercise/:chapter_id
+
+실습 과제 완료 여부를 업데이트합니다.
+
+Request
+
+{
+  "is_complete": true
+}
+
+
+Response
+
+{
+  "chapter_id": 10,
+  "is_complete": true,
+  "updated_at": "2025-11-01T12:25:00"
+}
+
+🧮 Quiz Router
+1. 퀴즈 목록 조회
+
+GET /quiz/:chapter_id
+
+챕터에 속한 3개의 퀴즈(slot 1~3)를 조회합니다.
+
+Response
+
+[
+  {
+    "slot_number": 1,
+    "question": "for문에서 range(5)의 반복 횟수는?",
+    "options": ["4회", "5회", "6회"],
+    "type": "multiple"
+  },
+  {
+    "slot_number": 2,
+    "question": "while문 종료 조건은 무엇인가요?",
+    "type": "short"
+  },
+  {
+    "slot_number": 3,
+    "question": "for문은 반복 제어문이다. (O/X)",
+    "type": "boolean"
+  }
+]
+
+2. 퀴즈 풀이 제출
+
+POST /quiz/:chapter_id
+
+특정 슬롯 퀴즈에 대한 답안을 제출합니다.
+
+Request
+
+{
+  "slot_number": 1,
+  "answer": "5회",
+  "member_id": 1
+}
+
+
+Response
+
+{
+  "slot_number": 1,
+  "is_correct": true,
+  "explanation": "range(5)는 0~4까지 총 5번 반복됩니다.",
+  "score": 10
+}
+
+3. 형성평가 채점 완료
+
+PATCH /quiz/:chapter_id
+
+챕터의 퀴즈 채점을 완료 상태로 변경합니다.
+
+Request
+
+{
+  "status": "completed"
+}
+
+
+Response
+
+{
+  "chapter_id": 10,
+  "status": "completed",
+  "updated_at": "2025-11-01T12:30:00"
+}
+
+4. 결과 보기
+
+GET /quiz/result/:chapter_id
+
+퀴즈 점수 및 정답률을 조회합니다.
+
+Response
+
+{
+  "chapter_id": 10,
+  "correct_count": 2,
+  "total": 3,
+  "score": 66,
+  "accuracy": 0.66
+}
+
+5. 다시 풀기
+
+POST /quiz/restart/:chapter_id
+
+기존 채점 결과를 초기화하고 퀴즈를 다시 풀 수 있게 합니다.
+
+Response
+
+{
+  "chapter_id": 10,
+  "reset_status": true,
+  "updated_at": "2025-11-01T12:35:00"
+}
+
+
+이 구조는 그대로 백엔드 라우터 설계에 옮겨도 될 만큼 명확하게 정리되어 있고,
+각 Router 단위로 FastAPI의 구조 (@router.get, @router.post)에 1:1로 대응됩니다.
