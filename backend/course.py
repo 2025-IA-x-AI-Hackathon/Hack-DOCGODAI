@@ -1,111 +1,87 @@
+"""
+Course Router
+강의 리스트 조회, 강의 생성, 강의 상세 보기
+"""
+
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
+from typing import List
 import schemas
 import models
 from database import get_db
-from kafka_producer import send_course_created_event
-from auth import get_current_user
-import json
 
 router = APIRouter(prefix="/v1/course", tags=["course"])
 
-# 강의 리스트 조회
-@router.get("/", response_model=schemas.CourseListResponse)
+
+@router.get("/", response_model=List[schemas.CourseResponse])
 def get_course_list(db: Session = Depends(get_db)):
-    """모든 강의 리스트를 반환합니다."""
+    """
+    강의 리스트 조회
+    등록된 모든 강의 목록을 조회합니다.
+    """
     courses = db.query(models.Course).all()
 
-    course_items = [
-        schemas.CourseItem(
-            courseId=course.id,
-            courseTitle=course.courseTitle,
-            courseDescription=course.courseDescription or "",
-            total=len(course.chapters) if course.chapters else 0,
-            complete=0  # TODO: 완료된 챕터 수 계산 로직 추가
+    return [
+        schemas.CourseResponse(
+            id=course.id,
+            title=course.title,
+            description=course.description or "",
+            difficulty=course.difficulty.value if course.difficulty else "medium",
+            owner_id=course.owner_id,
+            created_at=course.created_at
         )
         for course in courses
     ]
-    return schemas.CourseListResponse(courses=course_items)
 
 
-# 강의 생성
-@router.post("/", response_model=schemas.CourseCreateResponse)
-def create_course(
-    course: schemas.CourseCreate,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
-):
-    """새로운 강의를 생성합니다."""
-    # link 배열을 JSON 문자열로 변환
-    link_json = json.dumps(course.link)
-
+@router.post("/", response_model=schemas.CourseResponse)
+def create_course(course: schemas.CourseCreate, db: Session = Depends(get_db)):
+    """
+    강의 생성
+    새로운 강의를 생성합니다.
+    """
     new_course = models.Course(
-        member_id=current_user["user_id"],
-        courseTitle=course.courseTitle,
-        courseDescription=course.courseDescription,
-        prompt=course.prompt,
-        maxchapters=course.maxchapters,
-        link=link_json,
-        difficulty=course.difficulty
+        title=course.title,
+        description=course.description,
+        difficulty=course.difficulty,
+        owner_id=course.owner_id
     )
 
     db.add(new_course)
     db.commit()
     db.refresh(new_course)
 
-    # Kafka 이벤트 발행
-    send_course_created_event(
-        course_id=new_course.id,
-        name=new_course.courseTitle,
-        description=new_course.courseDescription or "",
-        member_id=current_user["user_id"]
+    return schemas.CourseResponse(
+        id=new_course.id,
+        title=new_course.title,
+        description=new_course.description or "",
+        difficulty=new_course.difficulty.value if new_course.difficulty else "medium",
+        owner_id=new_course.owner_id,
+        created_at=new_course.created_at
     )
 
-    # 챕터 리스트 생성 (현재는 빈 배열, 나중에 AI로 생성)
-    chapters = []
 
-    return schemas.CourseCreateResponse(
-        course={
-            "id": new_course.id,
-            "chapters": chapters
-        }
-    )
-
-# 강의 상세 조회
-@router.get("/{course_id}")
-def get_course(course_id: int, db: Session = Depends(get_db)):
-    """특정 강의의 상세 정보를 반환합니다."""
+@router.get("/{course_id}", response_model=schemas.CourseDetailResponse)
+def get_course_detail(course_id: int, db: Session = Depends(get_db)):
+    """
+    강의 상세 보기
+    특정 강의의 상세 정보를 조회합니다.
+    """
     course = db.query(models.Course).filter(models.Course.id == course_id).first()
-
     if not course:
         raise HTTPException(status_code=404, detail=f"Course {course_id} not found")
 
-    # link를 JSON 파싱 (문자열로 저장되어 있으면)
-    link_list = []
-    if course.link:
-        try:
-            link_list = json.loads(course.link)
-        except:
-            link_list = []
+    # 챕터 정보 조회
+    chapters = db.query(models.Chapter).filter(models.Chapter.course_id == course_id).all()
+    chapter_list = [
+        schemas.ChapterBasic(id=chapter.id, title=chapter.title)
+        for chapter in chapters
+    ]
 
-    # 챕터 정보 가져오기
-    chapter_items = []
-    if course.chapters:
-        for chapter in course.chapters:
-            chapter_items.append({
-                "chapterId": chapter.id,
-                "chapterTitle": chapter.title,
-                "chapterDescription": getattr(chapter, 'description', ''),
-                "isGenerated": "completed",  # TODO: 실제 생성 상태 로직 추가
-                "isCompleted": False  # TODO: 실제 진행 여부 로직 추가
-            })
-
-    return {
-        "courseTitle": course.courseTitle,
-        "courseDescription": course.courseDescription or "",
-        "prompt": course.prompt or "",
-        "maxchapters": course.maxchapters or 0,
-        "link": link_list,
-        "difficulty": course.difficulty or 0,
-        "chapters": chapter_items
-    }
+    return schemas.CourseDetailResponse(
+        id=course.id,
+        title=course.title,
+        description=course.description or "",
+        difficulty=course.difficulty.value if course.difficulty else "medium",
+        chapters=chapter_list
+    )

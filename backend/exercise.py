@@ -1,71 +1,61 @@
-# from fastapi import APIRouter, HTTPException, Depends
-# from sqlalchemy.orm import Session
-# import schemas
-# import models
-# from database import get_db
+"""
+Exercise Router
+실습 과제 보기, 실습 과제 완료
+"""
 
-# router = APIRouter(prefix="/v1/exercise", tags=["exercise"])
-
-# @router.get("/{chapter_id}")
-# def get_exercise(chapter_id: int, db: Session = Depends(get_db)):
-#     """
-#     특정 챕터의 실습 과제 내용을 반환합니다.
-#     """
-#     exercise = db.query(models.Exercise).filter(models.Exercise.chapter_id == chapter_id).first()
-#     if not exercise:
-#         raise HTTPException(status_code=404, detail=f"Exercise for chapter {chapter_id} not found")
-    
-#     return {"contents": exercise.subject_md}
-
-# @router.post("/{chapter_id}")
-# def complete_exercise(chapter_id: int, db: Session = Depends(get_db)):
-#     """
-#     특정 챕터의 실습 과제를 완료 처리합니다.
-#     """
-#     exercise = db.query(models.Exercise).filter(models.Exercise.chapter_id == chapter_id).first()
-#     if not exercise:
-#         raise HTTPException(status_code=404, detail=f"Exercise for chapter {chapter_id} not found")
-    
-#     exercise.is_complete = "true"  # Or True, depending on the column type
-#     db.commit()
-    
-#     return {}
-
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
-from typing import Dict
-
+from datetime import datetime
 import schemas
 import models
 from database import get_db
 
 router = APIRouter(prefix="/v1/exercise", tags=["exercise"])
 
-@router.get("/{chapter_id}", response_model=Dict[str, str])
-def get_exercise_content(chapter_id: int, db: Session = Depends(get_db)):
+
+@router.get("/{chapter_id}", response_model=schemas.ExerciseResponse)
+def get_exercise(chapter_id: int, db: Session = Depends(get_db)):
     """
     실습 과제 보기
-    - Request: {}
-    - Response: {"contents": string}
+    해당 챕터의 실습 과제를 조회합니다.
     """
+    # 챕터의 실습과제 조회
     exercise = db.query(models.Exercise).filter(models.Exercise.chapter_id == chapter_id).first()
-    if not exercise:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="해당 챕터의 실습 과제를 찾을 수 없습니다.")
-    
-    return {"contents": exercise.subject_md}
 
-@router.post("/{chapter_id}", status_code=status.HTTP_204_NO_CONTENT)
-def mark_exercise_as_complete(chapter_id: int, db: Session = Depends(get_db)):
+    if not exercise:
+        raise HTTPException(status_code=404, detail=f"Exercise for chapter {chapter_id} not found")
+
+    return schemas.ExerciseResponse(
+        id=exercise.id,
+        chapter_id=exercise.chapter_id,
+        question=exercise.question or "",
+        difficulty=exercise.difficulty.value if exercise.difficulty else "medium",
+        is_complete=exercise.is_complete or False
+    )
+
+
+@router.patch("/{chapter_id}", response_model=schemas.ExerciseCompleteResponse)
+def complete_exercise(
+    chapter_id: int,
+    complete_data: schemas.ExerciseComplete,
+    db: Session = Depends(get_db)
+):
     """
     실습 과제 완료
-    - Request: {}
-    - Response: {}
+    실습 과제 완료 여부를 업데이트합니다.
     """
+    # 챕터의 실습과제 조회
     exercise = db.query(models.Exercise).filter(models.Exercise.chapter_id == chapter_id).first()
+
     if not exercise:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="해당 챕터의 실습 과제를 찾을 수 없습니다.")
-    
-    exercise.is_complete = True
+        raise HTTPException(status_code=404, detail=f"Exercise for chapter {chapter_id} not found")
+
+    # 완료 상태 업데이트
+    exercise.is_complete = complete_data.is_complete
     db.commit()
-    
-    return {}
+
+    return schemas.ExerciseCompleteResponse(
+        chapter_id=chapter_id,
+        is_complete=complete_data.is_complete,
+        updated_at=datetime.utcnow()
+    )

@@ -4,6 +4,7 @@ SQLAlchemy 데이터베이스 모델
 """
 
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Enum, ForeignKey, JSON
+from sqlalchemy.dialects.mysql import LONGTEXT
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -100,8 +101,7 @@ class Concept(Base):
     chapter_id = Column(Integer, ForeignKey("chapter.id"), nullable=False)
     owner_id = Column(Integer, ForeignKey("member.id"), nullable=False)
     title = Column(String(255), nullable=False)
-    content = Column(Text, nullable=False)
-    example = Column(Text, nullable=True)
+    content = Column(LONGTEXT, nullable=False)
     is_complete = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
