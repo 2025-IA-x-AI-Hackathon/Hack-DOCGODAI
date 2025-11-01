@@ -4,6 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
+import { ROUTE } from "@/shared/constants";
 import { formStyle } from "@/shared/styles";
 import { HookFormInput, Section } from "@/shared/ui";
 
@@ -91,7 +92,7 @@ const SignupPage = () => {
         <div className="text-center text-sm">
           <p className="text-default-500">
             이미 계정이 있으신가요?{" "}
-            <Link className="text-primary hover:underline" to="/login">
+            <Link className="text-primary hover:underline" to={ROUTE.login}>
               로그인
             </Link>
           </p>

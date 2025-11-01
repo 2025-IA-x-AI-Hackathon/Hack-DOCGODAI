@@ -1,6 +1,7 @@
 import { Navbar, NavbarBrand, NavbarContent, NavbarItem } from "@heroui/react";
 import { Link } from "@tanstack/react-router";
 
+import { ROUTE } from "@/shared/constants";
 import { sectionStyle } from "@/shared/styles";
 import { ThemeSwitcher } from "@/shared/ui";
 
@@ -22,7 +23,7 @@ const Navigation = () => {
         <NavbarItem>
           <Link
             className="text-default-600 hover:text-foreground text-sm transition-colors"
-            to="/login"
+            to={ROUTE.login}
           >
             로그인
           </Link>
@@ -30,7 +31,7 @@ const Navigation = () => {
         <NavbarItem>
           <Link
             className="text-primary hover:text-primary-600 text-sm font-medium transition-colors"
-            to="/signup"
+            to={ROUTE.signup}
           >
             회원가입
           </Link>

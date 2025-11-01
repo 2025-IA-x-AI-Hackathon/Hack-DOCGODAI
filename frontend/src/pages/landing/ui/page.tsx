@@ -8,6 +8,7 @@ import {
   SparklesIcon,
 } from "lucide-react";
 
+import { ROUTE } from "@/shared/constants";
 import { sectionStyle } from "@/shared/styles";
 import { Card } from "@/shared/ui";
 
@@ -112,7 +113,7 @@ const LandingPage = () => {
                 className="min-w-[200px]"
                 color="primary"
                 size="lg"
-                to="/signup"
+                to={ROUTE.signup}
               >
                 무료로 시작하기
               </Button>
@@ -122,7 +123,7 @@ const LandingPage = () => {
                 as={Link}
                 className="min-w-[200px]"
                 size="lg"
-                to="/login"
+                to={ROUTE.login}
                 variant="bordered"
               >
                 로그인
@@ -294,7 +295,7 @@ const LandingPage = () => {
               className="min-w-[200px]"
               color="primary"
               size="lg"
-              to="/signup"
+              to={ROUTE.signup}
             >
               무료로 시작하기
             </Button>
