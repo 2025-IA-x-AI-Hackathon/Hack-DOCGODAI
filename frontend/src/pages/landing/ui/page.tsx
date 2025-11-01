@@ -66,7 +66,7 @@ const LandingPage = () => {
   return (
     <div className="flex min-h-screen flex-col">
       {/* Hero Section */}
-      <section className="relative flex min-h-[90vh] flex-col items-center justify-center overflow-hidden px-6 py-20 text-center">
+      <section className="relative flex max-h-[960px] min-h-[80vh] flex-col items-center justify-center overflow-hidden px-6 py-20 text-center">
         <motion.div
           animate="animate"
           className="mx-auto max-w-4xl"
