@@ -1,392 +1,342 @@
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
+"""
+Chapter Router (단일 질문-학습 모드)
+질문 등록 및 학습 페이지 조회
+"""
+
+from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
+from typing import Optional, List
 import schemas
 import models
 from database import get_db
-from kafka_producer import (
-    send_chapter_created_event,
-    send_concept_created_event,
-    send_exercise_created_event
+from socketio_manager import (
+    emit_chapter_processing_started,
+    emit_concept_processing,
+    emit_exercise_processing,
+    emit_quiz_processing,
+    emit_concept_completed,
+    emit_exercise_completed,
+    emit_quiz_completed,
+    emit_all_completed
 )
-from socketio_manager import emit_concept_finish, emit_exercise_finish, emit_quiz_finish
 
 router = APIRouter(prefix="/v1/chapter", tags=["chapter"])
 
 
-# ============================================
-# 기존 코드 (주석 처리됨)
-# ============================================
-
-# # 챕터 생성 (구버전)
-# @router.post("/old", response_model=schemas.ChapterResponse)
-# def create_chapter_old(chapter: schemas.ChapterCreate, db: Session = Depends(get_db)):
-#     """새로운 챕터를 생성합니다. (구버전)"""
-#     # 강의 존재 확인
-#     course = db.query(models.Course).filter(models.Course.id == chapter.course_id).first()
-#     if not course:
-#         raise HTTPException(status_code=404, detail=f"Course {chapter.course_id} not found")
-#
-#     new_chapter = models.Chapter(
-#         course_id=chapter.course_id,
-#         title=chapter.title,
-#         order_num=0  # TODO: 순서 자동 계산
-#     )
-#
-#     db.add(new_chapter)
-#     db.commit()
-#     db.refresh(new_chapter)
-#
-#     # Kafka 이벤트 발행
-#     send_chapter_created_event(
-#         chapter_id=new_chapter.id,
-#         course_id=new_chapter.course_id,
-#         title=new_chapter.title
-#     )
-#
-#     return schemas.ChapterResponse(
-#         id=new_chapter.id,
-#         course_id=new_chapter.course_id,
-#         title=new_chapter.title,
-#         content="",
-#         created_at=new_chapter.created_at.isoformat()
-#     )
-
-
-# ============================================
-# 새로운 API 명세에 따른 엔드포인트
-# ============================================
-
-# 챕터 생성 (N8N + Gemini 연동)
+# 1. 질문 등록 (챕터 생성)
 @router.post("/", response_model=schemas.ChapterCreateResponse)
-def create_chapter(chapter: schemas.ChapterCreateRequest, db: Session = Depends(get_db)):
+async def create_chapter(chapter: schemas.ChapterCreate, db: Session = Depends(get_db)):
     """
-    새로운 챕터를 생성하고 Kafka 이벤트를 발행합니다.
-    N8N이 이벤트를 받아 Gemini에게 개념정리, 실습과제, 형성평가를 요청합니다.
+    학생이 질문을 등록합니다.
+    질문 1개 → Chapter 1개 → Concept 1개 + Exercise 1개 + Quiz 1개 (빈 값)
+
+    Flow:
+    1. 챕터 생성 (title = 질문)
+    2. 빈 Concept, Exercise, Quiz 생성
+    3. Socket.IO로 처리 시작 알림 발송
+    4. Kafka로 AI 생성 요청 전송 (실제 Kafka 코드는 미구현)
+    5. n8n이 AI 응답을 받아 webhook으로 전송
     """
-    try:
-        # 강의 존재 확인
-        course = db.query(models.Course).filter(models.Course.id == chapter.course_id).first()
-        if not course:
-            raise HTTPException(status_code=404, detail=f"Course {chapter.course_id} not found")
+    # 챕터 생성
+    new_chapter = models.Chapter(
+        owner_id=chapter.owner_id,
+        title=chapter.title,
+        description=chapter.description,
+        status=models.StatusEnum.pending,
+        is_active=True
+    )
+    db.add(new_chapter)
+    db.flush()  # chapter.id 생성
 
-        # 새 챕터 생성
-        new_chapter = models.Chapter(
-            course_id=chapter.course_id,
-            title=chapter.title,
-            description=chapter.description or "",
-            order_num=0  # TODO: 순서 자동 계산
-        )
+    # 개념 정리 생성 (빈 값)
+    new_concept = models.Concept(
+        chapter_id=new_chapter.id,
+        title=None,
+        content=None,
+        is_complete=False
+    )
+    db.add(new_concept)
+    db.flush()
 
-        db.add(new_chapter)
-        db.commit()
-        db.refresh(new_chapter)
+    # 실습 과제 생성 (빈 값)
+    new_exercise = models.Exercise(
+        chapter_id=new_chapter.id,
+        question=None,
+        answer=None,
+        is_complete=False
+    )
+    db.add(new_exercise)
+    db.flush()
 
-        # Kafka 이벤트 발행 - N8N이 이를 감지하고 Gemini 호출
-        send_chapter_created_event(
-            chapter_id=new_chapter.id,
-            course_id=new_chapter.course_id,
-            title=new_chapter.title
-        )
+    # 퀴즈 생성 (빈 값)
+    new_quiz = models.Quiz(
+        chapter_id=new_chapter.id,
+        question=None,
+        options=None,
+        correct_answer=None,
+        type=models.QuizTypeEnum.multiple
+    )
+    db.add(new_quiz)
+    db.flush()
 
-        # 성공 응답
-        return schemas.ChapterCreateResponse(
-            key="chapter-create",
-            chapterId=new_chapter.id,
-            state="success"
-        )
+    db.commit()
+    db.refresh(new_chapter)
 
-    except Exception as e:
-        # 실패 응답
-        db.rollback()
-        return schemas.ChapterCreateResponse(
-            key="chapter-create",
-            chapterId=0,
-            state="failure"
-        )
+    # Socket.IO 실시간 알림 발송 - 처리 시작
+    await emit_chapter_processing_started(new_chapter.id, new_chapter.title)
+    await emit_concept_processing(new_chapter.id, new_concept.id)
+    await emit_exercise_processing(new_chapter.id, new_exercise.id)
+    await emit_quiz_processing(new_chapter.id, 1)
 
+    # TODO: Kafka로 AI 생성 요청 전송
+    # send_to_kafka(chapter_id=new_chapter.id, title=new_chapter.title)
 
-# # 챕터 개념정리 생성 (구버전)
-# @router.post("/{chapter_id}/concept/old", response_model=schemas.ConceptResponse)
-# def create_concept_summary_old(chapter_id: int, concept_text: str, db: Session = Depends(get_db)):
-#     """챕터의 개념정리를 생성합니다. (구버전)"""
-#     # 챕터 존재 확인
-#     chapter = db.query(models.Chapter).filter(models.Chapter.id == chapter_id).first()
-#     if not chapter:
-#         raise HTTPException(status_code=404, detail=f"Chapter {chapter_id} not found")
-#
-#     new_concept = models.Concept(
-#         chapter_id=chapter_id,
-#         concept=concept_text
-#     )
-#
-#     db.add(new_concept)
-#     db.commit()
-#     db.refresh(new_concept)
-#
-#     # Kafka 이벤트 발행
-#     send_concept_created_event(
-#         concept_id=new_concept.id,
-#         chapter_id=new_concept.chapter_id,
-#         concept=new_concept.concept
-#     )
-#
-#     return schemas.ConceptResponse(
-#         id=new_concept.id,
-#         chapter_id=new_concept.chapter_id,
-#         concept=new_concept.concept
-#     )
+    return schemas.ChapterCreateResponse(
+        chapter_id=new_chapter.id,
+        concept_id=new_concept.id,
+        exercise_id=new_exercise.id,
+        quiz_id=new_quiz.id,
+        status=new_chapter.status.value,
+        created_at=new_chapter.created_at
+    )
 
 
-# # 챕터 형성평가(연습문제) 생성 (구버전)
-# @router.post("/{chapter_id}/exercise/old", response_model=schemas.ExerciseResponse)
-# def create_exercise_old(chapter_id: int, exercise: schemas.ExerciseCreate, db: Session = Depends(get_db)):
-#     """챕터의 형성평가를 생성합니다. (구버전)"""
-#     # 챕터 존재 확인
-#     chapter = db.query(models.Chapter).filter(models.Chapter.id == chapter_id).first()
-#     if not chapter:
-#         raise HTTPException(status_code=404, detail=f"Chapter {chapter_id} not found")
-#
-#     new_exercise = models.Exercise(
-#         chapter_id=chapter_id,
-#         exercise=exercise.exercise,
-#         is_correct=exercise.is_correct
-#     )
-#
-#     db.add(new_exercise)
-#     db.commit()
-#     db.refresh(new_exercise)
-#
-#     # Kafka 이벤트 발행
-#     send_exercise_created_event(
-#         exercise_id=new_exercise.id,
-#         chapter_id=new_exercise.chapter_id,
-#         exercise=new_exercise.exercise,
-#         is_correct=new_exercise.is_correct
-#     )
-#
-#     return schemas.ExerciseResponse(
-#         id=new_exercise.id,
-#         chapter_id=new_exercise.chapter_id,
-#         exercise=new_exercise.exercise,
-#         is_correct=new_exercise.is_correct
-#     )
-
-
-# # 챕터 상세 조회 (구버전)
-# @router.get("/{chapter_id}/old", response_model=schemas.ChapterResponse)
-# def get_chapter_old(chapter_id: int, db: Session = Depends(get_db)):
-#     """특정 챕터의 상세 정보를 반환합니다. (구버전)"""
-#     chapter = db.query(models.Chapter).filter(models.Chapter.id == chapter_id).first()
-#
-#     if not chapter:
-#         raise HTTPException(status_code=404, detail=f"Chapter {chapter_id} not found")
-#
-#     return schemas.ChapterResponse(
-#         id=chapter.id,
-#         course_id=chapter.course_id,
-#         title=chapter.title,
-#         content="",
-#         created_at=chapter.created_at.isoformat()
-#     )
-
-
-# # 챕터의 개념정리 조회 (구버전)
-# @router.get("/{chapter_id}/concept/old")
-# def get_chapter_concepts_old(chapter_id: int, db: Session = Depends(get_db)):
-#     """특정 챕터의 개념정리를 반환합니다. (구버전)"""
-#     concepts = db.query(models.Concept).filter(models.Concept.chapter_id == chapter_id).all()
-#     return {
-#         "chapter_id": chapter_id,
-#         "concepts": [{"id": c.id, "chapter_id": c.chapter_id, "concept": c.concept} for c in concepts]
-#     }
-
-
-# 챕터 상세 조회 (새 버전)
-@router.get("/{chapter_id}", response_model=schemas.ChapterGetResponse)
-def get_chapter(chapter_id: int, db: Session = Depends(get_db)):
+# 2. 단일 학습 페이지 조회 (한 번에 모든 데이터)
+@router.get("/{chapter_id}/learning", response_model=schemas.SingleLearningPage)
+def get_learning_page(chapter_id: int, db: Session = Depends(get_db)):
     """
-    특정 챕터의 상세 정보를 반환합니다.
-    개념정리, 실습과제, 형성평가의 생성 여부 및 완료 여부를 포함합니다.
+    단일 학습 페이지 조회
+    Chapter + Concept + Exercise + Quiz를 한 번에 조회
+
+    프론트엔드는 이 API 한 번만 호출하면 모든 데이터를 받을 수 있습니다.
     """
     # 챕터 조회
     chapter = db.query(models.Chapter).filter(models.Chapter.id == chapter_id).first()
     if not chapter:
-        raise HTTPException(status_code=404, detail=f"Chapter {chapter_id} not found")
+        raise HTTPException(status_code=404, detail="Chapter not found")
 
-    # 개념정리 조회
-    concepts = db.query(models.Concept).filter(models.Concept.chapter_id == chapter_id).all()
-    concept_descriptions = [c.concept for c in concepts] if concepts else []
-    concept_is_complete = all(c.is_complete for c in concepts) if concepts else False
-    concept_is_available = any(c.is_available for c in concepts) if concepts else False
-
-    # 실습과제 조회
-    exercises = db.query(models.Exercise).filter(models.Exercise.chapter_id == chapter_id).all()
-    exercise_descriptions = [e.exercise for e in exercises] if exercises else []
-    exercise_is_complete = all(e.is_complete for e in exercises) if exercises else False
-    exercise_is_available = any(e.is_available for e in exercises) if exercises else False
-
-    # 형성평가 조회
-    quizzes = db.query(models.Quiz).filter(models.Quiz.chapter_id == chapter_id).all()
-    quiz_descriptions = [q.question for q in quizzes] if quizzes else []
-    quiz_is_complete = all(q.is_complete for q in quizzes) if quizzes else False
-    quiz_is_available = any(q.is_available for q in quizzes) if quizzes else False
-
-    return schemas.ChapterGetResponse(
-        chapter=schemas.ChapterDetail(
-            chapterDescription=chapter.description or "",
-            concept=schemas.ConceptDetail(
-                conceptDescription=concept_descriptions,
-                isComplete=concept_is_complete
-            ),
-            exercise=schemas.ExerciseDetail(
-                isAvailable=exercise_is_available,
-                exerciseDescription=exercise_descriptions,
-                isComplete=exercise_is_complete
-            ),
-            quiz=schemas.QuizDetail(
-                quizDescription=quiz_descriptions,
-                isAvailable=quiz_is_available,
-                isComplete=quiz_is_complete
-            )
+    # Concept 조회 (1:1)
+    concept = db.query(models.Concept).filter(models.Concept.chapter_id == chapter_id).first()
+    concept_dto = None
+    if concept:
+        concept_dto = schemas.ConceptDTO(
+            id=concept.id,
+            title=concept.title,
+            content=concept.content,
+            is_complete=concept.is_complete
         )
+
+    # Exercise 조회 (1:1)
+    exercise = db.query(models.Exercise).filter(models.Exercise.chapter_id == chapter_id).first()
+    exercise_dto = None
+    if exercise:
+        exercise_dto = schemas.ExerciseDTO(
+            id=exercise.id,
+            question=exercise.question,
+            is_complete=exercise.is_complete
+        )
+
+    # Quiz 조회 (1:1)
+    quiz = db.query(models.Quiz).filter(models.Quiz.chapter_id == chapter_id).first()
+    quiz_dto = None
+    if quiz:
+        # 옵션이 JSON 문자열인 경우 파싱
+        options = None
+        if quiz.options:
+            import json
+            if isinstance(quiz.options, str):
+                options = json.loads(quiz.options)
+            else:
+                options = quiz.options
+
+        quiz_dto = schemas.QuizDTO(
+            id=quiz.id,
+            question=quiz.question,
+            options=options,
+            type=quiz.type.value
+        )
+
+    return schemas.SingleLearningPage(
+        chapter_id=chapter.id,
+        title=chapter.title,
+        description=chapter.description,
+        status=chapter.status.value,
+        concept=concept_dto,
+        exercise=exercise_dto,
+        quiz=quiz_dto
     )
 
 
-# ============================================
-# Webhook 엔드포인트 (N8N이 호출)
-# ============================================
+# 3. 챕터 목록 조회
+@router.get("/", response_model=List[schemas.ChapterListItem])
+def get_chapters(
+    skip: int = 0,
+    limit: int = 20,
+    owner_id: Optional[int] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    챕터 목록 조회 (학생의 질문 목록)
+    """
+    query = db.query(models.Chapter)
 
-# N8N Gemini 개념정리 완료 Webhook
-@router.post("/{chapter_id}/concept-finish", response_model=schemas.WebhookConceptFinish)
+    if owner_id:
+        query = query.filter(models.Chapter.owner_id == owner_id)
+
+    chapters = query.order_by(models.Chapter.created_at.desc()).offset(skip).limit(limit).all()
+
+    return [schemas.ChapterListItem.from_orm(chapter) for chapter in chapters]
+
+
+# ==================== N8N Webhook 엔드포인트 ====================
+
+@router.post("/{chapter_id}/concept-finish", response_model=schemas.WebhookResponse)
 async def concept_finish_webhook(
     chapter_id: int,
-    webhook_data: schemas.WebhookConceptFinish,
-    background_tasks: BackgroundTasks,
+    data: schemas.ConceptWebhook,
     db: Session = Depends(get_db)
 ):
     """
-    N8N이 Gemini로부터 개념정리 생성 완료 후 호출하는 Webhook입니다.
+    개념 정리 생성 완료 webhook (n8n → 백엔드)
     """
-    try:
-        # 챕터 존재 확인
-        chapter = db.query(models.Chapter).filter(models.Chapter.id == chapter_id).first()
-        if not chapter:
-            raise HTTPException(status_code=404, detail=f"Chapter {chapter_id} not found")
+    chapter = db.query(models.Chapter).filter(models.Chapter.id == chapter_id).first()
+    if not chapter:
+        raise HTTPException(status_code=404, detail="Chapter not found")
 
-        # Gemini가 생성한 개념정리 데이터 저장
-        if webhook_data.state == "success" and webhook_data.conceptData:
-            for concept_text in webhook_data.conceptData:
-                new_concept = models.Concept(
-                    chapter_id=chapter_id,
-                    concept=concept_text,
-                    is_available=True,  # 생성 완료
-                    is_complete=False   # 아직 학습 안 함
-                )
-                db.add(new_concept)
+    concept = db.query(models.Concept).filter(models.Concept.chapter_id == chapter_id).first()
+    if not concept:
+        raise HTTPException(status_code=404, detail="Concept not found")
 
-            db.commit()
+    # AI가 생성한 데이터로 업데이트
+    concept.title = data.title
+    concept.content = data.content
+    concept.is_complete = True
 
-        # Socket.IO로 클라이언트에 실시간 알림
-        await emit_concept_finish(
-            chapter_id=chapter_id,
-            state=webhook_data.state,
-            concept_data=webhook_data.conceptData
-        )
+    db.commit()
+    db.refresh(concept)
 
-        return webhook_data
+    # Socket.IO로 완료 알림 발송
+    await emit_concept_completed(chapter_id, concept.id)
 
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+    # 모든 리소스 완료 확인
+    await check_and_emit_all_completed(chapter_id, db)
+
+    return schemas.WebhookResponse(
+        status="success",
+        message="개념 정리가 성공적으로 저장되었습니다",
+        chapter_id=chapter_id
+    )
 
 
-# N8N Gemini 실습과제 완료 Webhook
-@router.post("/{chapter_id}/exercise-finish", response_model=schemas.WebhookExerciseFinish)
+@router.post("/{chapter_id}/exercise-finish", response_model=schemas.WebhookResponse)
 async def exercise_finish_webhook(
     chapter_id: int,
-    webhook_data: schemas.WebhookExerciseFinish,
-    background_tasks: BackgroundTasks,
+    data: schemas.ExerciseWebhook,
     db: Session = Depends(get_db)
 ):
     """
-    N8N이 Gemini로부터 실습과제 생성 완료 후 호출하는 Webhook입니다.
+    실습 과제 생성 완료 webhook (n8n → 백엔드)
     """
-    try:
-        # 챕터 존재 확인
-        chapter = db.query(models.Chapter).filter(models.Chapter.id == chapter_id).first()
-        if not chapter:
-            raise HTTPException(status_code=404, detail=f"Chapter {chapter_id} not found")
+    chapter = db.query(models.Chapter).filter(models.Chapter.id == chapter_id).first()
+    if not chapter:
+        raise HTTPException(status_code=404, detail="Chapter not found")
 
-        # Gemini가 생성한 실습과제 데이터 저장
-        if webhook_data.state == "success" and webhook_data.exerciseData:
-            for exercise_text in webhook_data.exerciseData:
-                new_exercise = models.Exercise(
-                    chapter_id=chapter_id,
-                    exercise=exercise_text,
-                    is_correct=False,   # 기본값
-                    is_available=True,  # 생성 완료
-                    is_complete=False   # 아직 완료 안 함
-                )
-                db.add(new_exercise)
+    exercise = db.query(models.Exercise).filter(models.Exercise.chapter_id == chapter_id).first()
+    if not exercise:
+        raise HTTPException(status_code=404, detail="Exercise not found")
 
-            db.commit()
+    # AI가 생성한 데이터로 업데이트
+    exercise.question = data.question
+    exercise.answer = data.answer
+    exercise.is_complete = True
 
-        # Socket.IO로 클라이언트에 실시간 알림
-        await emit_exercise_finish(
-            chapter_id=chapter_id,
-            state=webhook_data.state,
-            exercise_data=webhook_data.exerciseData
-        )
+    db.commit()
+    db.refresh(exercise)
 
-        return webhook_data
+    # Socket.IO로 완료 알림 발송
+    await emit_exercise_completed(chapter_id, exercise.id)
 
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+    # 모든 리소스 완료 확인
+    await check_and_emit_all_completed(chapter_id, db)
+
+    return schemas.WebhookResponse(
+        status="success",
+        message="실습 과제가 성공적으로 저장되었습니다",
+        chapter_id=chapter_id
+    )
 
 
-# N8N Gemini 형성평가 완료 Webhook
-@router.post("/{chapter_id}/quiz-finish", response_model=schemas.WebhookQuizFinish)
+@router.post("/{chapter_id}/quiz-finish", response_model=schemas.WebhookResponse)
 async def quiz_finish_webhook(
     chapter_id: int,
-    webhook_data: schemas.WebhookQuizFinish,
-    background_tasks: BackgroundTasks,
+    data: schemas.QuizWebhook,
     db: Session = Depends(get_db)
 ):
     """
-    N8N이 Gemini로부터 형성평가 생성 완료 후 호출하는 Webhook입니다.
+    퀴즈 생성 완료 webhook (n8n → 백엔드)
     """
-    try:
-        # 챕터 존재 확인
+    chapter = db.query(models.Chapter).filter(models.Chapter.id == chapter_id).first()
+    if not chapter:
+        raise HTTPException(status_code=404, detail="Chapter not found")
+
+    quiz = db.query(models.Quiz).filter(models.Quiz.chapter_id == chapter_id).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+
+    # AI가 생성한 데이터로 업데이트
+    quiz.question = data.question
+    quiz.correct_answer = data.correct_answer
+    quiz.type = data.type
+
+    if data.options:
+        import json
+        quiz.options = json.dumps(data.options)
+
+    db.commit()
+    db.refresh(quiz)
+
+    # Socket.IO로 완료 알림 발송
+    await emit_quiz_completed(chapter_id, 1)
+
+    # 모든 리소스 완료 확인
+    await check_and_emit_all_completed(chapter_id, db)
+
+    return schemas.WebhookResponse(
+        status="success",
+        message="퀴즈가 성공적으로 저장되었습니다",
+        chapter_id=chapter_id
+    )
+
+
+async def check_and_emit_all_completed(chapter_id: int, db: Session):
+    """
+    모든 리소스(개념, 실습, 퀴즈)가 완료되었는지 확인하고,
+    모두 완료되었으면 all_completed 이벤트 발송 + 챕터 상태 업데이트
+    """
+    # 개념 정리 완료 확인
+    concept = db.query(models.Concept).filter(
+        models.Concept.chapter_id == chapter_id,
+        models.Concept.is_complete == True
+    ).first()
+
+    # 실습 과제 완료 확인
+    exercise = db.query(models.Exercise).filter(
+        models.Exercise.chapter_id == chapter_id,
+        models.Exercise.is_complete == True
+    ).first()
+
+    # 퀴즈 완료 확인
+    quiz = db.query(models.Quiz).filter(
+        models.Quiz.chapter_id == chapter_id
+    ).first()
+    quiz_complete = quiz and quiz.question is not None
+
+    # 모두 완료되었으면 all_completed 이벤트 발송
+    if concept and exercise and quiz_complete:
+        # 챕터 상태 업데이트
         chapter = db.query(models.Chapter).filter(models.Chapter.id == chapter_id).first()
-        if not chapter:
-            raise HTTPException(status_code=404, detail=f"Chapter {chapter_id} not found")
-
-        # Gemini가 생성한 퀴즈 데이터 저장
-        if webhook_data.state == "success" and webhook_data.quizData:
-            for quiz_text in webhook_data.quizData:
-                new_quiz = models.Quiz(
-                    chapter_id=chapter_id,
-                    question=quiz_text,
-                    question_type="서술형",  # 기본값 (Gemini가 타입도 보내면 수정 가능)
-                    answer="",  # 기본값
-                    is_available=True,  # 생성 완료
-                    is_complete=False   # 아직 완료 안 함
-                )
-                db.add(new_quiz)
-
+        if chapter:
+            chapter.status = models.StatusEnum.completed
             db.commit()
 
-        # Socket.IO로 클라이언트에 실시간 알림
-        await emit_quiz_finish(
-            chapter_id=chapter_id,
-            state=webhook_data.state,
-            quiz_data=webhook_data.quizData
-        )
-
-        return webhook_data
-
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-
+        await emit_all_completed(chapter_id)

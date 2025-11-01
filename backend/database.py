@@ -1,6 +1,6 @@
 """
 데이터베이스 연결 설정
-SQLAlchemy를 사용한 MySQL 연결
+SQLAlchemy를 사용한 MySQL 연결 + Redis 연결
 """
 
 from sqlalchemy import create_engine
@@ -8,6 +8,11 @@ from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import QueuePool
 from typing import Generator
 import os
+from dotenv import load_dotenv
+import redis
+
+# .env 파일 로드
+load_dotenv()
 
 # 환경 변수에서 데이터베이스 설정 가져오기
 DB_USER = os.getenv("DB_USER", "root")
@@ -15,6 +20,11 @@ DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = os.getenv("DB_PORT", "3306")
 DB_NAME = os.getenv("DB_NAME", "your_database_name")
+
+# Redis 설정
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
+REDIS_DB = int(os.getenv("REDIS_DB", 0))
 
 # 데이터베이스 URL 생성
 DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}?charset=utf8mb4"
@@ -35,6 +45,14 @@ SessionLocal = sessionmaker(
     autocommit=False,
     autoflush=False,
     bind=engine
+)
+
+# Redis 클라이언트 생성
+redis_client = redis.Redis(
+    host=REDIS_HOST,
+    port=REDIS_PORT,
+    db=REDIS_DB,
+    decode_responses=True  # 문자열로 자동 디코딩
 )
 
 
@@ -85,38 +103,16 @@ def drop_db():
     print("All database tables dropped!")
 
 
-# Repository 인스턴스 생성 헬퍼 함수
-def get_member_repository(db: Session):
-    """회원 Repository 가져오기"""
-    from repository import MemberRepository
-    return MemberRepository(db)
+def get_redis() -> redis.Redis:
+    """
+    Redis 클라이언트 의존성
 
+    Usage:
+        @app.get("/cache")
+        def get_cache(redis: redis.Redis = Depends(get_redis)):
+            ...
 
-def get_course_repository(db: Session):
-    """코스 Repository 가져오기"""
-    from repository import CourseRepository
-    return CourseRepository(db)
-
-
-def get_chapter_repository(db: Session):
-    """챕터 Repository 가져오기"""
-    from repository import ChapterRepository
-    return ChapterRepository(db)
-
-
-def get_concept_repository(db: Session):
-    """개념 Repository 가져오기"""
-    from repository import ConceptRepository
-    return ConceptRepository(db)
-
-
-def get_exercise_repository(db: Session):
-    """연습문제 Repository 가져오기"""
-    from repository import ExerciseRepository
-    return ExerciseRepository(db)
-
-
-def get_quiz_repository(db: Session):
-    """퀴즈 Repository 가져오기"""
-    from repository import QuizRepository
-    return QuizRepository(db)
+    Returns:
+        redis.Redis: Redis 클라이언트
+    """
+    return redis_client
