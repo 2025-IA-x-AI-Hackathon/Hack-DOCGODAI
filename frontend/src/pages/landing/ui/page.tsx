@@ -11,6 +11,7 @@ import {
 import { ROUTE } from "@/shared/constants";
 import { sectionStyle } from "@/shared/styles";
 import { Card } from "@/shared/ui";
+import Footer from "@/widgets/footer";
 
 const features = [
   {
@@ -302,6 +303,9 @@ const LandingPage = () => {
           </motion.div>
         </motion.div>
       </section>
+
+      {/* Footer */}
+      <Footer />
     </div>
   );
 };
