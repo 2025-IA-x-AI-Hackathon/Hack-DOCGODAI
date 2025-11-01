@@ -266,7 +266,11 @@ const LandingPage = () => {
       </section>
 
       {/* CTA Section */}
-      <section className={sectionStyle({ class: "bg-primary/5 py-20" })}>
+      <section
+        className={sectionStyle({
+          class: "bg-primary/5 dark:bg-primary/10 py-20",
+        })}
+      >
         <motion.div
           className="mx-auto max-w-4xl px-6 text-center"
           initial="initial"
