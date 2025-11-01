@@ -1,5 +1,5 @@
 import { Button } from "@heroui/react";
-import { Link, useParams } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { ArrowLeftIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
@@ -53,10 +53,6 @@ const markdownContent = rawMarkdownContent.replace(/\\n/g, "\n");
 // 다만 API에서 이스케이프된 형태로 오는 경우에만 .replace(/\\n/g, "\n") 필요
 
 const ConceptPage = () => {
-  const { courseId, chapterId } = useParams({
-    from: "/study/$courseId/$chapterId/concept",
-  });
-
   return (
     <Section subtitle="개념을 학습하고 이해하세요" title="개념 정리">
       <Card className="p-8">
@@ -154,14 +150,7 @@ const ConceptPage = () => {
       <div className="mt-6 flex justify-between">
         <Button
           as={Link}
-          params={
-            {
-              courseId: String(courseId),
-              chapterId: String(chapterId),
-            } as never
-          }
           startContent={<ArrowLeftIcon className="h-4 w-4" />}
-          to="/study/$courseId/$chapterId"
           variant="light"
         >
           뒤로 가기
