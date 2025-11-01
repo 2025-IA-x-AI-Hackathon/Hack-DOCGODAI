@@ -81,7 +81,7 @@ const LandingPage = () => {
             <br />
             <motion.span
               animate={{ opacity: 1, scale: 1 }}
-              className="text-primary"
+              className="from-primary-400 via-primary-500 to-primary-700 bg-linear-to-r bg-clip-text text-transparent"
               initial={{ opacity: 0, scale: 0.8 }}
               transition={{ delay: 0.3, duration: 0.5 }}
             >

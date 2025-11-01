@@ -10,8 +10,10 @@ export default heroui({
         },
         primary: {
           DEFAULT: "#14B8A6",
+          400: "#16CAB5",
           500: "#14B8A6",
           600: "#12A594",
+          700: "#109384",
         },
         secondary: {
           DEFAULT: "#18181b",
@@ -28,8 +30,10 @@ export default heroui({
         },
         primary: {
           DEFAULT: "#14B8A6",
+          400: "#16CAB5",
           500: "#14B8A6",
           600: "#12A594",
+          700: "#109384",
         },
         secondary: {
           DEFAULT: "#52525b",
