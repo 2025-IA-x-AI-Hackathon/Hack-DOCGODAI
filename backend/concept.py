@@ -26,18 +26,15 @@ def get_concept_summary(chapter_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail=f"Concept for chapter {chapter_id} not found")
 
     return schemas.ConceptResponse(
-        id=concept.id,
         chapter_id=concept.chapter_id,
         title=concept.title,
         content=concept.content or "",
-        is_complete=concept.is_complete or False
     )
 
 
 @router.patch("/{chapter_id}", response_model=schemas.ConceptCompleteResponse)
 def complete_concept_summary(
     chapter_id: int,
-    complete_data: schemas.ConceptComplete,
     db: Session = Depends(get_db)
 ):
     """
@@ -51,11 +48,11 @@ def complete_concept_summary(
         raise HTTPException(status_code=404, detail=f"Concept for chapter {chapter_id} not found")
 
     # 완료 상태 업데이트
-    concept.is_complete = complete_data.is_complete
+    concept.is_complete = True
     db.commit()
 
     return schemas.ConceptCompleteResponse(
         chapter_id=chapter_id,
-        is_complete=complete_data.is_complete,
+        is_complete=True,
         updated_at=datetime.utcnow()
     )

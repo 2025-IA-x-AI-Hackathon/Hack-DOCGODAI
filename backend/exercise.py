@@ -25,19 +25,18 @@ def get_exercise(chapter_id: int, db: Session = Depends(get_db)):
     if not exercise:
         raise HTTPException(status_code=404, detail=f"Exercise for chapter {chapter_id} not found")
 
+
     return schemas.ExerciseResponse(
-        id=exercise.id,
         chapter_id=exercise.chapter_id,
-        question=exercise.question or "",
-        difficulty=exercise.difficulty.value if exercise.difficulty else "medium",
-        is_complete=exercise.is_complete or False
+        title=exercise.title,
+        description=exercise.description,
+        contents=exercise.contents,
     )
 
 
 @router.patch("/{chapter_id}", response_model=schemas.ExerciseCompleteResponse)
 def complete_exercise(
     chapter_id: int,
-    complete_data: schemas.ExerciseComplete,
     db: Session = Depends(get_db)
 ):
     """
@@ -51,11 +50,11 @@ def complete_exercise(
         raise HTTPException(status_code=404, detail=f"Exercise for chapter {chapter_id} not found")
 
     # 완료 상태 업데이트
-    exercise.is_complete = complete_data.is_complete
+    exercise.is_complete = True
     db.commit()
 
     return schemas.ExerciseCompleteResponse(
         chapter_id=chapter_id,
-        is_complete=complete_data.is_complete,
+        is_complete=True,
         updated_at=datetime.utcnow()
     )

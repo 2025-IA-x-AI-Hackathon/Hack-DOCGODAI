@@ -105,15 +105,26 @@ class QuizSlot(BaseModel):
     slot_number: int
     status: str  # pending, completed
 
+class ChapterDetailConcept(BaseModel):
+    is_available: bool
+    concept_description: list[str]
+    is_complete: bool
+
+class ChapterDetailExercise(BaseModel):
+    is_available: bool
+    exercise_description: list[str]
+    is_complete: bool
+
+class ChapterDetailQuiz(BaseModel):
+    is_available: bool
+    quiz_description: list[str]
+    is_complete: bool
 
 class ChapterDetailResponse(BaseModel):
     id: int
-    title: str
-    description: str
-    is_active: bool
-    concept: ConceptStatus
-    exercise: ExerciseStatus
-    quiz: List[QuizSlot]
+    concept: ChapterDetailConcept
+    exercise: ChapterDetailExercise
+    quiz: ChapterDetailQuiz
 
 
 # ============================================
@@ -121,11 +132,9 @@ class ChapterDetailResponse(BaseModel):
 # ============================================
 
 class ConceptResponse(BaseModel):
-    id: int
     chapter_id: int
     title: str
     content: str
-    is_complete: bool
 
 
 class ConceptComplete(BaseModel):
@@ -142,12 +151,12 @@ class ConceptCompleteResponse(BaseModel):
 # Exercise Schemas
 # ============================================
 
+
 class ExerciseResponse(BaseModel):
-    id: int
     chapter_id: int
-    question: str
-    difficulty: str
-    is_complete: bool
+    title: str
+    description: str
+    contents: str
 
 
 class ExerciseComplete(BaseModel):
@@ -165,23 +174,22 @@ class ExerciseCompleteResponse(BaseModel):
 # ============================================
 
 class QuizItem(BaseModel):
-    slot_number: int
-    question: str
-    options: Optional[List[str]] = None
-    type: str  # multiple, short, boolean
+    id: int
+    title: str
 
+class QuizContent(BaseModel):
+    contents: list[QuizItem]
 
 class QuizSubmit(BaseModel):
-    slot_number: int
+    id: int
     answer: str
-    member_id: int
+
+class QuizSubmitContent(BaseModel):
+    answers: list[QuizSubmit]
 
 
 class QuizSubmitResponse(BaseModel):
-    slot_number: int
-    is_correct: bool
-    explanation: str
-    score: int
+
 
 
 class QuizComplete(BaseModel):
@@ -206,3 +214,88 @@ class QuizRestartResponse(BaseModel):
     chapter_id: int
     reset_status: bool
     updated_at: datetime
+
+
+# ============================================
+# N8N Webhook Schemas
+# ============================================
+
+# 개념 정리 생성 요청 (N8N Webhook)
+class WebhookConceptRequest(BaseModel):
+    courseTitle: str
+    courseDescription: str
+    chapterTitle: str
+    chapterDescription: str
+
+
+class WebhookConceptResponse(BaseModel):
+    title: str
+    description: str
+    contents: str
+
+
+# 실습 생성 요청 (N8N Webhook)
+class WebhookExerciseRequest(BaseModel):
+    courseTitle: str
+    courseDescription: str
+    chapterTitle: str
+    chapterDescription: str
+
+
+class WebhookExerciseResponse(BaseModel):
+    title: str
+    description: str
+    contents: str  # md 파일
+
+
+# 형성평가 생성 요청 (N8N Webhook)
+class WebhookQuizRequest(BaseModel):
+    courseTitle: str
+    chapterTitle: str
+    coursePrompt: str
+
+
+class WebhookQuizItem(BaseModel):
+    quiz: str
+
+
+class WebhookQuizResponse(BaseModel):
+    quizes: List[WebhookQuizItem]
+
+
+# 퀴즈 정답 제출 요청 (N8N Webhook)
+class WebhookAnswerQuizItem(BaseModel):
+    quiz: str
+    answer: str
+
+
+class WebhookAnswerOutput(BaseModel):
+    courseTitle: str
+    courseDescription: str
+    contents: List[WebhookAnswerQuizItem]
+
+
+class WebhookAnswerRequest(BaseModel):
+    output: WebhookAnswerOutput
+
+
+class WebhookAnswerScore(BaseModel):
+    id: int
+    score: int
+    correct_answer: str
+
+
+class WebhookAnswerResponse(BaseModel):
+    scores: List[WebhookAnswerScore]
+
+
+# 퀴즈 채점 결과 Webhook (N8N → Backend)
+class WebhookQuizGradingResult(BaseModel):
+    chapter_id: int
+    quiz_id: int
+    slot_number: int
+    member_id: int
+    is_correct: bool
+    score: int
+    correct_answer: str
+    explanation: Optional[str] = None

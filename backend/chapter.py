@@ -3,17 +3,21 @@ Chapter Router
 챕터 생성, 챕터 상세 보기
 """
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 import schemas
 import models
 from database import get_db
+from kafka_producer import send_chapter_created_event
 
 router = APIRouter(prefix="/v1/chapter", tags=["chapter"])
 
 
 @router.post("/", response_model=schemas.ChapterCreateResponse)
-def create_chapter(chapter: schemas.ChapterCreate, db: Session = Depends(get_db)):
+def create_chapter(
+    chapter: schemas.ChapterCreate,
+    db: Session = Depends(get_db)
+):
     """
     챕터 생성
     새 챕터를 생성하고, 아래 세 가지 리소스를 동시에 생성합니다:
@@ -48,6 +52,8 @@ def create_chapter(chapter: schemas.ChapterCreate, db: Session = Depends(get_db)
         is_complete=False
     )
     db.add(new_concept)
+    db.commit()
+    db.refresh(new_concept)
 
     # Exercise 생성 (빈 상태, N8N + Gemini가 채움)
     new_exercise = models.Exercise(
@@ -59,6 +65,8 @@ def create_chapter(chapter: schemas.ChapterCreate, db: Session = Depends(get_db)
         is_complete=False
     )
     db.add(new_exercise)
+    db.commit()
+    db.refresh(new_exercise)
 
     # Quiz 3개 슬롯 생성 (빈 상태, N8N + Gemini가 채움)
     for slot_num in range(1, 4):
@@ -70,11 +78,19 @@ def create_chapter(chapter: schemas.ChapterCreate, db: Session = Depends(get_db)
             type="multiple"  # 기본값
         )
         db.add(new_quiz)
-
     db.commit()
 
-    # TODO: Kafka 이벤트 발행하여 N8N에게 Gemini 호출 요청
-    # send_chapter_created_event(chapter_id=new_chapter.id)
+    # Kafka 이벤트 발행 - N8N이 이를 받아서 Gemini 호출
+    send_chapter_created_event(
+        chapter_id=new_chapter.id,
+        course_id=course.id,
+        owner_id=chapter.owner_id,
+        course_title=course.title,
+        course_description=course.description or "",
+        chapter_title=chapter.title,
+        chapter_description=chapter.description,
+        course_prompt=""  # TODO: Course에서 prompt 필드 추가 필요
+    )
 
     return schemas.ChapterCreateResponse(
         chapter_id=new_chapter.id,
@@ -127,6 +143,16 @@ def get_chapter_detail(chapter_id: int, db: Session = Depends(get_db)):
             quiz_statuses.append(schemas.QuizSlot(slot_number=i, status="pending"))
         else:
             quiz_statuses.append(schemas.QuizSlot(slot_number=i, status="pending"))
+
+    c = db.query(models.Concept).filter(models.Chapter.id == chapter_id).first()
+
+    conceptNull = False
+    if not c:
+        conceptNull = True
+    concept = schemas.ChapterDetailConcept(
+        is_available=conceptNull,
+
+    )
 
     return schemas.ChapterDetailResponse(
         id=chapter.id,

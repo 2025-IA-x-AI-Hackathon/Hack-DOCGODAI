@@ -44,20 +44,20 @@ def get_quiz_list(chapter_id: int, db: Session = Depends(get_db)):
 
         quiz_items.append(
             schemas.QuizItem(
-                id=quiz.id,
-                title=quiz.title
+                slot_number=i,
+                question=quiz.question or "",
+                options=options,
+                type=quiz.type.value if quiz.type else "multiple"
             )
         )
 
-    return schemas.QuizContent(
-        contents=quiz_items
-    )
+    return quiz_items
 
 
 @router.post("/{chapter_id}")
 def submit_quiz_answer(
     chapter_id: int,
-    submit_data: schemas.QuizSubmitContent,
+    submit_data: schemas.QuizSubmit,
     db: Session = Depends(get_db)
 ):
     """
@@ -80,37 +80,36 @@ def submit_quiz_answer(
     if not course:
         raise HTTPException(status_code=404, detail=f"Course not found")
 
-    # 각 제출된 답안에 대해 Kafka 이벤트 발행 (비동기 처리)
-    submitted_quizzes = []
-    for answer_item in submit_data.answers:
-        # 퀴즈 조회
-        quiz = db.query(models.Quiz).filter(models.Quiz.id == answer_item.id).first()
-        if not quiz:
-            raise HTTPException(status_code=404, detail=f"Quiz {answer_item.id} not found")
-
-        # Kafka 이벤트 발행 (N8N이 받아서 Gemini 채점)
-        send_quiz_answer_submit_event(
-            chapter_id=chapter_id,
-            quiz_id=quiz.id,
-            slot_number=answer_item.id,  # quiz id를 slot_number로 사용
-            member_id=1,  # TODO: 실제 member_id 전달 필요
-            course_title=course.title,
-            course_description=course.description or "",
-            quiz_question=quiz.question or "",
-            user_answer=answer_item.answer
+    # 퀴즈 조회
+    quizzes = db.query(models.Quiz).filter(models.Quiz.chapter_id == chapter_id).limit(3).all()
+    if not quizzes or len(quizzes) < submit_data.slot_number:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Quiz slot {submit_data.slot_number} for chapter {chapter_id} not found"
         )
 
-        submitted_quizzes.append({
-            "quiz_id": quiz.id,
-            "question": quiz.question
-        })
+    # 해당 슬롯의 퀴즈
+    quiz = quizzes[submit_data.slot_number - 1]
+
+    # Kafka 이벤트 발행 (비동기 처리)
+    send_quiz_answer_submit_event(
+        chapter_id=chapter_id,
+        quiz_id=quiz.id,
+        slot_number=submit_data.slot_number,
+        member_id=submit_data.member_id,
+        course_title=course.title,
+        course_description=course.description or "",
+        quiz_question=quiz.question or "",
+        user_answer=submit_data.answer
+    )
 
     # 즉시 응답 반환 (리턴 1)
     return {
         "status": "submitted",
         "message": "답안이 제출되었습니다. 채점 결과는 실시간으로 전송됩니다.",
         "chapter_id": chapter_id,
-        "submitted_quizzes": submitted_quizzes
+        "quiz_id": quiz.id,
+        "slot_number": submit_data.slot_number
     }
 
 
