@@ -1,5 +1,7 @@
 import { Button } from "@heroui/react";
+import { useNavigate } from "@tanstack/react-router";
 
+import { ROUTE } from "@/shared/constants";
 import { Card } from "@/shared/ui";
 
 interface Props {
@@ -13,6 +15,7 @@ const getButtonText = (lastStepIndex: number) => {
 };
 
 const ChapterCard = ({ chapter }: Props) => {
+  const navigate = useNavigate();
   const progress = Math.round((chapter.lastStepIndex / 3) * 100);
 
   return (
@@ -33,6 +36,12 @@ const ChapterCard = ({ chapter }: Props) => {
         <Button
           color={chapter.lastStepIndex === 3 ? "secondary" : "primary"}
           radius="full"
+          onPress={() =>
+            navigate({
+              to: ROUTE.chapter,
+              params: { chapterId: chapter.id.toString() },
+            })
+          }
         >
           {getButtonText(chapter.lastStepIndex)}
         </Button>

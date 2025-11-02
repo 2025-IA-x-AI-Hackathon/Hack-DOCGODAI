@@ -32,7 +32,7 @@ const CoursePage = () => {
       title: "분산의 실전 활용",
       description:
         "분산을 활용한 실제 데이터 분석 사례를 학습합니다. 다양한 상황에서 분산을 계산하고 해석하는 방법을 실습을 통해 익힙니다.",
-      lastStepIndex: 0, // 미시작 (0%)
+      lastStepIndex: 1, // 미시작 (0%)
     },
     {
       id: 5,
