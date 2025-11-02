@@ -5,4 +5,3 @@ import DashboardPage from "@/pages/dashboard";
 export const Route = createFileRoute("/study/")({
   component: DashboardPage,
 });
-

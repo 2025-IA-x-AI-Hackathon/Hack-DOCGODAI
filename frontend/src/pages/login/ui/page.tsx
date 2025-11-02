@@ -1,27 +1,22 @@
 import { Button, Form } from "@heroui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { useSetAtom } from "jotai";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 
 import { ROUTE } from "@/shared/constants";
+import { tokenAtom } from "@/shared/store";
 import { formStyle } from "@/shared/styles";
 import { HookFormInput, Section } from "@/shared/ui";
 
-const loginSchema = z.object({
-  email: z
-    .string()
-    .min(1, "이메일을 입력해주세요")
-    .email("올바른 이메일 형식을 입력해주세요"),
-  password: z
-    .string()
-    .min(8, "비밀번호는 최소 8자 이상이어야 합니다")
-    .max(20, "비밀번호는 최대 20자 이하이어야 합니다"),
-});
-
-type LoginFormData = z.infer<typeof loginSchema>;
+import { login } from "../api";
+import { loginSchema } from "../model/schema";
+import type { LoginFormData } from "../model/types";
 
 const LoginPage = () => {
+  const navigate = useNavigate();
+  const setToken = useSetAtom(tokenAtom);
+
   const {
     control,
     handleSubmit,
@@ -35,9 +30,19 @@ const LoginPage = () => {
   });
 
   const onSubmit = async (data: LoginFormData) => {
-    // TODO: 실제 로그인 API 호출
-    console.log("Login data:", data);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    try {
+      const {
+        status,
+        data: { token },
+      } = await login(data);
+
+      if (status === 200 && token) {
+        setToken(token);
+        navigate({ to: ROUTE.dashboard, replace: true });
+      }
+    } catch (error) {
+      console.debug(error);
+    }
   };
 
   const styles = formStyle();
