@@ -5,12 +5,6 @@ import CourseCard from "@/pages/dashboard/ui/course-card.tsx";
 import NewCourse from "@/pages/dashboard/ui/new-course.tsx";
 import { Card, Section } from "@/shared/ui";
 
-const fadeInUp = {
-  initial: { opacity: 0, y: 20 },
-  animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.4 },
-};
-
 const staggerContainer = {
   initial: { opacity: 0 },
   animate: {
@@ -47,7 +41,7 @@ const DashboardPage = () => {
           { label: "완료", value: null },
           { label: "주간 학습(가)", value: null },
           { label: "평균 정답률", value: null },
-        ].map((stat, index) => (
+        ].map((stat) => (
           <motion.div key={stat.label} variants={staggerItem}>
             <Card className="p-6">
               <div className="text-default-500 text-sm">{stat.label}</div>
@@ -72,7 +66,16 @@ const DashboardPage = () => {
         variants={staggerContainer}
       >
         <motion.div variants={staggerItem}>
-          <CourseCard description="Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris n" />
+          <CourseCard
+            course={{
+              id: 1,
+              title: "표준편차와 분산 완전 정복",
+              description:
+                "표준편차와 분산의 개념부터 실전 활용까지 체계적으로 학습합니다. 표준편차를 구하는 식에서 루트를 씌우는 이유, 분산과 표준편차의 차이점, 데이터셋 해석 방법을 배워보세요.",
+              totalSteps: 5,
+              completedSteps: 3,
+            }}
+          />
         </motion.div>
         <motion.div variants={staggerItem}>
           <NewCourse />
