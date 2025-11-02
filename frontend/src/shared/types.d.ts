@@ -5,3 +5,10 @@ interface Course {
   totalSteps: number;
   completedSteps: number;
 }
+
+interface Chapter {
+  id: number;
+  title: string;
+  description: string;
+  lastStepIndex: number;
+}
