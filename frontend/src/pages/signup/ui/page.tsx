@@ -1,25 +1,19 @@
 import { Button, Form } from "@heroui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 
 import { ROUTE } from "@/shared/constants";
 import { formStyle } from "@/shared/styles";
 import { HookFormInput, Section } from "@/shared/ui";
 
-const signupSchema = z.object({
-  name: z.string().min(1, "이름을 입력해주세요"),
-  email: z.string().email("올바른 이메일 형식을 입력해주세요"),
-  password: z
-    .string()
-    .min(8, "비밀번호는 최소 8자 이상이어야 합니다")
-    .max(20, "비밀번호는 최대 20자 이하이어야 합니다"),
-});
-
-type SignupFormData = z.infer<typeof signupSchema>;
+import { signup } from "../api";
+import { signupSchema } from "../model/schema";
+import type { SignupFormData } from "../model/types";
 
 const SignupPage = () => {
+  const navigate = useNavigate();
+
   const {
     control,
     handleSubmit,
@@ -35,9 +29,14 @@ const SignupPage = () => {
   });
 
   const onSubmit = async (data: SignupFormData) => {
-    // TODO: 실제 회원가입 API 호출
-    console.log("Signup data:", data);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    try {
+      const { status } = await signup(data);
+      if (status === 200) {
+        navigate({ to: ROUTE.login, replace: true });
+      }
+    } catch (error) {
+      console.debug(error);
+    }
   };
 
   const styles = formStyle();
