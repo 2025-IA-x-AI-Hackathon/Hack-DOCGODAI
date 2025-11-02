@@ -1,9 +1,12 @@
 import { motion } from "framer-motion";
+import { useAtomValue } from "jotai";
 import { BookOpenTextIcon, CircleCheckIcon } from "lucide-react";
 
 import CourseCard from "@/pages/dashboard/ui/course-card.tsx";
 import NewCourse from "@/pages/dashboard/ui/new-course.tsx";
 import { Card, Section } from "@/shared/ui";
+
+import { courseListAtom } from "../store";
 
 const staggerContainer = {
   initial: { opacity: 0 },
@@ -25,6 +28,8 @@ const staggerItem = {
 };
 
 const DashboardPage = () => {
+  const courseList = useAtomValue(courseListAtom);
+
   return (
     <Section
       subtitle="진행중인 모든 학습을 한눈에 관리하세요"
@@ -65,18 +70,13 @@ const DashboardPage = () => {
         initial="initial"
         variants={staggerContainer}
       >
-        <motion.div variants={staggerItem}>
-          <CourseCard
-            course={{
-              id: 1,
-              title: "표준편차와 분산 완전 정복",
-              description:
-                "표준편차와 분산의 개념부터 실전 활용까지 체계적으로 학습합니다. 표준편차를 구하는 식에서 루트를 씌우는 이유, 분산과 표준편차의 차이점, 데이터셋 해석 방법을 배워보세요.",
-              totalSteps: 5,
-              completedSteps: 3,
-            }}
-          />
-        </motion.div>
+        {courseList.map((course) => {
+          return (
+            <motion.div key={course.id} variants={staggerItem}>
+              <CourseCard course={course} />
+            </motion.div>
+          );
+        })}
         <motion.div variants={staggerItem}>
           <NewCourse />
         </motion.div>
