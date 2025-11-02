@@ -49,7 +49,7 @@ app.include_router(quiz_router)     # 퀴즈 제출
 socket_app = socketio.ASGIApp(sio, app)
 
 
-@app.get("/")
+@app.get("/api/v1/")
 def root():
     """Health check endpoint"""
     return {
@@ -78,6 +78,8 @@ def health_check():
         "api_version": "2.0.0"
     }
 
+@app.post("/api/v1/user/me")
+def 
 
 if __name__ == "__main__":
     # Socket.IO와 함께 실행
